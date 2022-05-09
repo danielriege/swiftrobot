@@ -19,13 +19,18 @@ public class SwiftRobotMaster {
     
     public func publish<M: Msg>(channel: UInt16, msg: M) {
         // inform all internal subscribers on that topic
-        notify(msg, channel: channel)
+        publishInternal(channel: channel, msg: msg)
         // send message to external subscribers
         do {
             try self.sendMessage(channel: channel, msg: msg)
         } catch {
             // error
         }
+    }
+    
+    public func publishInternal<M: Msg>(channel: UInt16, msg: M) {
+        // inform all internal subscribers on that topic
+        notify(msg, channel: channel)
     }
     
     public func subscribe<M>(channel: UInt16, callback: @escaping (M) -> Void) {
