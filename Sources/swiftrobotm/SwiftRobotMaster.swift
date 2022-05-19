@@ -1,15 +1,25 @@
 import Foundation
 import BinaryCodable
 
-public enum ConnectionType {
-    case none
-    case usb
+public typealias SubscriberPriority = DispatchQoS.QoSClass
+
+struct Subscriber {
+    let callback: Any
+    let priority: SubscriberPriority
+    let queue_size: Int
+    let semaphore: DispatchSemaphore
+    
+    init(callback: Any, priority: SubscriberPriority, queue_size: Int) {
+        self.callback = callback
+        self.priority = priority
+        self.queue_size = queue_size
+        self.semaphore = DispatchSemaphore(value: queue_size)
+    }
 }
 
 public class SwiftRobotMaster {
 
-    private var connectionType: ConnectionType = .none
-    private lazy var channel_subscriber_map: [UInt16: [Any]] = [:]
+    private lazy var subscribersForChannel: [UInt16: [Subscriber]] = [:]
     private var usbhub: Hub
     
     public init(port: UInt16) {
@@ -33,11 +43,12 @@ public class SwiftRobotMaster {
         notify(msg, channel: channel)
     }
     
-    public func subscribe<M>(channel: UInt16, callback: @escaping (M) -> Void) {
-        if channel_subscriber_map[channel] == nil {
-            channel_subscriber_map[channel] = []
+    public func subscribe<M>(channel: UInt16, callback: @escaping (M) -> Void, priority: SubscriberPriority = .default, queue_size: Int = 1) {
+        if subscribersForChannel[channel] == nil {
+            subscribersForChannel[channel] = []
         }
-        channel_subscriber_map[channel]!.append(callback)
+        let new_subscriber = Subscriber(callback: callback, priority: priority, queue_size: queue_size)
+        subscribersForChannel[channel]!.append(new_subscriber)
     }
     
     private func start() {
@@ -77,12 +88,18 @@ public class SwiftRobotMaster {
     }
     
     private func notify<M: Msg>(_ msg: M, channel: UInt16) {
-        if channel_subscriber_map[channel] != nil {
-            for subscriber_callback in channel_subscriber_map[channel]! {
-                if let callback = subscriber_callback as? (M) -> Void  {
-                    callback(msg)
-                } else {
-                    // wrong message type on channel
+        if subscribersForChannel[channel] != nil {
+            for subscriber in subscribersForChannel[channel]! {
+                if subscriber.semaphore.wait(timeout: .now()) == .timedOut {
+                    continue
+                }
+                DispatchQueue.global(qos: subscriber.priority).async {
+                    if let callback = subscriber.callback as? (M) -> Void  {
+                        callback(msg)
+                        subscriber.semaphore.signal()
+                    } else {
+                        // wrong message type on channel
+                    }
                 }
             }
         }
