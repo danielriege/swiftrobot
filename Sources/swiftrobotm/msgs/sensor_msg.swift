@@ -17,7 +17,7 @@ public extension sensor_msg {
             case YCrCb420v  = "420v"
             case YCrCb420f  = "420f"
             case RGBA       = "BGRA"
-            case Mono       = "mono"
+            case Mono       = "MONO"
         }
         
         public let width: UInt16

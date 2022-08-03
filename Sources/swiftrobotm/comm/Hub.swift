@@ -18,6 +18,14 @@ class Hub {
         self.port = NWEndpoint.Port(rawValue: port)!
         listener = try! NWListener(using: tcpParameters, on: self.port)
     }
+    
+    deinit {
+        for client_ in self.clients.values {
+            client_.stop()
+        }
+        listener.cancel()
+        print("closing server")
+    }
 
     func startLookingForConnections() throws {
         listener.stateUpdateHandler = self.stateDidChange(to:)

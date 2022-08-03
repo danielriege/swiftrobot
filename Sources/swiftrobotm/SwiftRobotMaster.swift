@@ -24,7 +24,6 @@ public class SwiftRobotMaster {
     
     public init(port: UInt16) {
         self.usbhub = Hub(port: port)
-        self.start()
     }
     
     public func publish<M: Msg>(channel: UInt16, msg: M) {
@@ -38,7 +37,7 @@ public class SwiftRobotMaster {
         }
     }
     
-    public func publishInternal<M: Msg>(channel: UInt16, msg: M) {
+    public func publishInternal<M>(channel: UInt16, msg: M) {
         // inform all internal subscribers on that topic
         notify(msg, channel: channel)
     }
@@ -51,7 +50,7 @@ public class SwiftRobotMaster {
         subscribersForChannel[channel]!.append(new_subscriber)
     }
     
-    private func start() {
+    public func start() {
         self.usbhub.registerRecieveCallback(callback: messageRecieved(data:))
         self.usbhub.registerStatusUpdateCallback { [self] deviceID, status in
             let statusUpdateMsg = internal_msgs.UpdateMsg(deviceID: deviceID, status: status)
@@ -87,10 +86,11 @@ public class SwiftRobotMaster {
         }
     }
     
-    private func notify<M: Msg>(_ msg: M, channel: UInt16) {
+    private func notify<M>(_ msg: M, channel: UInt16) {
         if subscribersForChannel[channel] != nil {
             for subscriber in subscribersForChannel[channel]! {
                 if subscriber.semaphore.wait(timeout: .now()) == .timedOut {
+                    print("semaphore not free")
                     continue
                 }
                 DispatchQueue.global(qos: subscriber.priority).async {
