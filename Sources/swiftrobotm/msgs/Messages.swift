@@ -29,6 +29,10 @@ let IMAGE_MSG: UInt16           = 0x0201
 let IMU_MSG: UInt16             = 0x0202
 // control_msg
 let DRIVE_MSG: UInt16           = 0x0301
+// nav_msg
+let ODOMETRY_MSG: UInt16        = 0x0401
+// state_msg
+let VESCSTATUS_MSG: UInt16      = 0x0501
 
 public protocol Message {
     func getType() -> UInt16

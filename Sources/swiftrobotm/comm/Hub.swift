@@ -68,7 +68,7 @@ class Hub {
     private func createClient(nwConnection: NWConnection) {
         let client = Client(nwConnection: nwConnection)
         self.clients[client.id] = client
-        client.didStopCallback = { _ in
+        client.didStopCallback = {
             self.connectionDidStop(client)
         }
         client.didReceiveMessage = { data in

@@ -76,7 +76,7 @@ class Client {
         Client.nextID += 1
     }
 
-    var didStopCallback: ((Error?) -> Void)? = nil
+    var didStopCallback: (() -> Void)? = nil
     var didReceiveMessage: ((Data) -> Void)? = nil
 
     func start() {
@@ -93,6 +93,8 @@ class Client {
             break
         case .failed(let error):
             connectionDidFail(error: error)
+        case .cancelled:
+            stop()
         default:
             break
         }
@@ -110,17 +112,14 @@ class Client {
                         buffer.load(as: UInt32.self)
                     }
                     self.bufferLength = messageSize
-                    
                     // with message size we know how many recieves we need
-//                    let numberOfRecieves = Int(ceil(Double(messageSize)/Double(self.MTU)))
-//                    self.bufferSegmentsAwaiting = numberOfRecieves - 1 // minus 1 because we already received one
                     // load received data into buffer
                     self.buffer = data
                 } else {
                     // we append the data
                     self.buffer!.append(data)
-//                    self.bufferSegmentsAwaiting! = self.bufferSegmentsAwaiting! - 1
                 }
+        
                 if self.buffer!.count == self.bufferLength! {
                     // unpack usbmux packet
                     do {
@@ -135,8 +134,26 @@ class Client {
                     self.buffer = nil
                     self.bufferLength = nil
                 } else if self.buffer!.count > self.bufferLength! {
-                    // siomething went terribly wrong
-                    print("Major problem receiving stream! We received more data than expected!")
+                    // we received more data than the packet size
+                    // If we have a fast stream, this could happen
+                    // so we need to cut the buffer by completing
+                    // a packet and simountanesly starting a new one
+                    
+                    // unpack usbmux packet with only bufferLength range
+                    do {
+                        let usbmux_packet = try BinaryDataDecoder().decode(usbmux_packet.self, from: self.buffer!.subdata(in: 0..<Int(self.bufferLength!)))
+                        if let callback = self.didReceiveMessage {
+                            callback(usbmux_packet.payload)
+                        }
+                    } catch {
+                        print("Error unpacking usbmux_packet")
+                    }
+                    // use other half of the previous buffer to determine new size
+                    self.buffer = self.buffer!.subdata(in: Int(self.bufferLength!)..<Int(self.buffer!.count))
+                    let messageSize = self.buffer!.withUnsafeBytes { buffer in
+                        buffer.load(as: UInt32.self)
+                    }
+                    self.bufferLength = messageSize
                 }
             }
             if isComplete {
@@ -166,28 +183,22 @@ class Client {
         }
     }
 
-    func stop() {
-        print("connection \(id) will stop")
-    }
-
-
-
     private func connectionDidFail(error: Error) {
         print("connection \(id) did fail, error: \(error)")
-        stop(error: error)
+        stop()
     }
 
     private func connectionDidEnd() {
         print("connection \(id) did end")
-        stop(error: nil)
+        stop()
     }
 
-    private func stop(error: Error?) {
+    public func stop() {
         connection.stateUpdateHandler = nil
         connection.cancel()
         if let didStopCallback = didStopCallback {
             self.didStopCallback = nil
-            didStopCallback(error)
+            didStopCallback()
         }
     }
 }

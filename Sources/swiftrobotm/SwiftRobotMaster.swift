@@ -77,6 +77,8 @@ public class SwiftRobotMaster {
             case IMU_MSG: notify(try BinaryDataDecoder().decode(sensor_msg.IMU.self, from: packet.data), channel: packet.channel)
             // control_msg
             case DRIVE_MSG: notify(try BinaryDataDecoder().decode(control_msg.Drive.self, from: packet.data), channel: packet.channel)
+            // nav_msg
+            case ODOMETRY_MSG: notify(try BinaryDataDecoder().decode(nav_msg.Odometry.self, from: packet.data), channel: packet.channel)
             default:
                 print("Received undefined message! ", packet.type, " on channel: ", packet.channel)
             }
@@ -90,7 +92,6 @@ public class SwiftRobotMaster {
         if subscribersForChannel[channel] != nil {
             for subscriber in subscribersForChannel[channel]! {
                 if subscriber.semaphore.wait(timeout: .now()) == .timedOut {
-                    print("semaphore not free")
                     continue
                 }
                 DispatchQueue.global(qos: subscriber.priority).async {
