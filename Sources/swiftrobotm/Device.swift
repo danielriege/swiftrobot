@@ -2,65 +2,7 @@ import Foundation
 import Network
 import BinaryCodable
 
-struct usbmux_packet: BinaryCodable {
-    
-    enum usbmux_protocol_t: UInt32, BinaryCodable {
-        case USBMuxPacketProtocolBinary = 0
-        case USBMuxPacketProtocolPlist = 1
-    }
-    
-    enum usbmux_type_t: UInt32, BinaryCodable {
-        case USBMuxPacketTypeResult = 1
-        case USBMuxPacketTypeConnect = 2
-        case USBMuxPacketTypeListen = 3
-        case USBMuxPacketTypeDeviceAdd = 4
-        case USBMuxPacketTypeDeviceRemove = 5
-        // ? = 6,
-        // ? = 7,
-        case USBMuxPacketTypePlistPayload = 8 // only supported type by usbmuxd by now
-        // Custom Types
-        case USBMuxPacketTypeApplicationData = 9
-    }
-    
-    let length: UInt32
-    let usbmux_protocol: usbmux_protocol_t
-    let type: usbmux_type_t
-    let tag: UInt32
-    let payload: Data
-    
-    init(usbmux_protocol: usbmux_protocol_t, type: usbmux_type_t, tag: UInt32, payload: Data) {
-        self.length = UInt32(16 + payload.count)
-        self.usbmux_protocol = usbmux_protocol
-        self.type = type
-        self.tag = tag
-        self.payload = payload
-    }
-    
-    init(from decoder: BinaryDecoder) throws {
-        var container = decoder.container(maxLength: nil)
-        self.length = try container.decode(UInt32.self)
-        
-        var protocolContainer = container.nestedContainer(maxLength: 4) // uint32_t is 4 bytes
-        self.usbmux_protocol = try protocolContainer.decode(usbmux_protocol_t.self)
-        
-        var typeContainer = container.nestedContainer(maxLength: 4) // uint32_t is 4 bytes
-        self.type = try typeContainer.decode(usbmux_type_t.self)
-        
-        self.tag = try container.decode(UInt32.self)
-        self.payload = try container.decode(length: Int(self.length - 16)) // previous types are 16 bytes in total
-    }
-    
-    func encode(to encoder: BinaryEncoder) throws {
-        var container = encoder.container()
-        try container.encode(length)
-        try container.encode(usbmux_protocol)
-        try container.encode(type)
-        try container.encode(tag)
-        try container.encode(sequence: payload)
-    }
-}
-
-class Client {
+class Device {
     //The TCP maximum package size is 64K 65536
     let MTU = 65536
 
@@ -72,17 +14,17 @@ class Client {
 
     init(nwConnection: NWConnection) {
         connection = nwConnection
-        id = Client.nextID
-        Client.nextID += 1
+        id = Device.nextID
+        Device.nextID += 1
     }
 
     var didStopCallback: (() -> Void)? = nil
-    var didReceiveMessage: ((Data) -> Void)? = nil
+    var didReceivePacket: ((UInt8, swiftrobot_packet_type, Data) -> Void)? = nil
 
     func start() {
         connection.stateUpdateHandler = self.stateDidChange(to:)
         setupReceive()
-        connection.start(queue: .main)
+        connection.start(queue: .global())
     }
 
     private func stateDidChange(to state: NWConnection.State) {
@@ -94,7 +36,7 @@ class Client {
         case .failed(let error):
             connectionDidFail(error: error)
         case .cancelled:
-            stop()
+            break
         default:
             break
         }
@@ -123,11 +65,9 @@ class Client {
                 if self.buffer!.count == self.bufferLength! {
                     // unpack usbmux packet
                     do {
-                        let usbmux_packet = try BinaryDataDecoder().decode(usbmux_packet.self, from: self.buffer!)
+                        let usbmux_packet = try BinaryDataDecoder().decode(swiftrobot_packet.self, from: self.buffer!)
                         // erase buffer
-                        if let callback = self.didReceiveMessage {
-                            callback(usbmux_packet.payload)
-                        }
+                        self.handlePacket(packet: usbmux_packet)
                     } catch {
                         print("Error unpacking usbmux_packet")
                     }
@@ -141,10 +81,8 @@ class Client {
                     
                     // unpack usbmux packet with only bufferLength range
                     do {
-                        let usbmux_packet = try BinaryDataDecoder().decode(usbmux_packet.self, from: self.buffer!.subdata(in: 0..<Int(self.bufferLength!)))
-                        if let callback = self.didReceiveMessage {
-                            callback(usbmux_packet.payload)
-                        }
+                        let usbmux_packet = try BinaryDataDecoder().decode(swiftrobot_packet.self, from: self.buffer!.subdata(in: 0..<Int(self.bufferLength!)))
+                        self.handlePacket(packet: usbmux_packet)
                     } catch {
                         print("Error unpacking usbmux_packet")
                     }
@@ -165,14 +103,20 @@ class Client {
             }
         }
     }
+    
+    private func handlePacket(packet: swiftrobot_packet) {
+        if let callback = self.didReceivePacket {
+            callback(UInt8(self.id), packet.type, packet.payload)
+        }
+    }
 
 
-    func send(data: Data) {
-        // build usbmux packet
+    func send(data: Data, type: swiftrobot_packet_type) {
+        // build packet
         do {
-            let usbmux_packet = usbmux_packet(usbmux_protocol: .USBMuxPacketProtocolBinary, type: .USBMuxPacketTypeApplicationData, tag: 3, payload: data)
-            let usbmux_packet_data: Data = try BinaryDataEncoder().encode(usbmux_packet)
-            self.connection.send(content: usbmux_packet_data, completion: .contentProcessed( { error in
+            let swiftrobot_packet = swiftrobot_packet(swiftrobot_protocol: .SwiftRobotPacketProtocol, type: type, tag: 3, payload: data)
+            let swiftrobot_packet_data: Data = try BinaryDataEncoder().encode(swiftrobot_packet)
+            self.connection.send(content: swiftrobot_packet_data, completion: .contentProcessed( { error in
                 if let error = error {
                     self.connectionDidFail(error: error)
                     return
@@ -184,21 +128,20 @@ class Client {
     }
 
     private func connectionDidFail(error: Error) {
-        print("connection \(id) did fail, error: \(error)")
-        stop()
-    }
-
-    private func connectionDidEnd() {
-        print("connection \(id) did end")
-        stop()
+        print("connection did fail. Probably disconnected by peer")
+        informAboutStop()
     }
 
     public func stop() {
         connection.stateUpdateHandler = nil
         connection.cancel()
+        informAboutStop()
+    }
+    
+    private func informAboutStop() {
         if let didStopCallback = didStopCallback {
-            self.didStopCallback = nil
             didStopCallback()
+            self.didStopCallback = nil
         }
     }
 }

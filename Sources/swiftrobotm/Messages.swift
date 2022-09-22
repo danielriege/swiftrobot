@@ -31,8 +31,6 @@ let IMU_MSG: UInt16             = 0x0202
 let DRIVE_MSG: UInt16           = 0x0301
 // nav_msg
 let ODOMETRY_MSG: UInt16        = 0x0401
-// state_msg
-let VESCSTATUS_MSG: UInt16      = 0x0501
 
 public protocol Message {
     func getType() -> UInt16
@@ -40,7 +38,9 @@ public protocol Message {
 
 public typealias Msg = BinaryCodable & Message
 
-struct SwiftRobotPacket: BinaryCodable {
+// MARK: - SwiftRobotPackets
+
+struct MessagePacket: BinaryCodable {
     let channel: UInt16
     let type: UInt16
     let data_size: UInt32
@@ -69,6 +69,8 @@ struct SwiftRobotPacket: BinaryCodable {
         try container.encode(sequence: data)
     }
 }
+
+// MARK: - Internal msgs
 
 public enum internal_msgs {}
 
