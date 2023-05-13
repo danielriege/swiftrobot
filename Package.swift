@@ -4,16 +4,16 @@
 import PackageDescription
 
 let package = Package(
-    name: "swiftrobotm",
+    name: "swiftrobot",
     platforms: [
-        .iOS(.v14),
-        .macOS(.v10_14)
+        .iOS(.v15),
+        .macOS(.v10_15)
     ],
     products: [
         // Products define the executables and libraries a package produces, and make them visible to other packages.
         .library(
-            name: "swiftrobotm",
-            targets: ["swiftrobotm"]),
+            name: "swiftrobot",
+            targets: ["swiftrobot"]),
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
@@ -26,10 +26,10 @@ let package = Package(
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
         // Targets can depend on other targets in this package, and on products in packages this package depends on.
         .target(
-            name: "swiftrobotm",
+            name: "swiftrobot",
             dependencies: ["BinaryCodable"]),
         .testTarget(
-            name: "swiftrobotmTests",
-            dependencies: ["swiftrobotm"]),
+            name: "swiftrobotTests",
+            dependencies: ["swiftrobot"]),
     ]
 )

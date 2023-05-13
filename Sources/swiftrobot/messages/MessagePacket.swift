@@ -40,7 +40,25 @@ public typealias Msg = BinaryCodable & Message
 
 // MARK: - SwiftRobotPackets
 
+/**
+ Base packet for all messages between swiftrobot clients. This would be the payload for a `swiftrobot_packet` with a `SwiftRobotPacketTypeMessage` type.
+ */
 struct MessagePacket: BinaryCodable {
+    static let type_lookup_table: [UInt16: Msg.Type] = [
+        UINT8ARRAY_MSG: base_msg.UInt8Array.self,
+        UINT16ARRAY_MSG: base_msg.UInt16Array.self,
+        UINT32ARRAY_MSG: base_msg.UInt32Array.self,
+        INT8ARRAY_MSG: base_msg.Int8Array.self,
+        INT16ARRAY_MSG: base_msg.Int16Array.self,
+        INT32ARRAY_MSG: base_msg.Int32Array.self,
+        FLOATARRAY_MSG: base_msg.FloatArray.self,
+        UPDATE_MSG: internal_msgs.UpdateMsg.self,
+        IMAGE_MSG: sensor_msg.Image.self,
+        IMU_MSG: sensor_msg.IMU.self,
+        DRIVE_MSG: control_msg.Drive.self,
+        ODOMETRY_MSG: nav_msg.Odometry.self
+    ]
+    
     let channel: UInt16
     let type: UInt16
     let data_size: UInt32
@@ -67,43 +85,6 @@ struct MessagePacket: BinaryCodable {
         try container.encode(type)
         try container.encode(data_size)
         try container.encode(sequence: data)
-    }
-}
-
-// MARK: - Internal msgs
-
-public enum internal_msgs {}
-
-public extension internal_msgs {
-    
-    struct UpdateMsg: Msg {
-        public enum status_t: UInt8, BinaryCodable {
-            case connected = 0
-            case disconnected = 1
-        }
-        
-        public let deviceID: UInt8
-        public let status: status_t
-        
-        public func getType() -> UInt16 {return UPDATE_MSG}
-        
-        public init(deviceID: UInt8, status: status_t) {
-            self.deviceID = deviceID
-            self.status = status
-        }
-        
-        public init(from decoder: BinaryDecoder) throws {
-            var container = decoder.container(maxLength: 2)
-            deviceID = try container.decode(UInt8.self)
-            var statusContainer = container.nestedContainer(maxLength: 1)
-            status = try statusContainer.decode(status_t.self)
-        }
-        
-        public func encode(to encoder: BinaryEncoder) throws {
-            var container = encoder.container()
-            try container.encode(deviceID)
-            try container.encode(status)
-        }
     }
 }
 

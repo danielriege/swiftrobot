@@ -22,7 +22,7 @@ public extension nav_msg {
         public let pitch: Float
         public let yaw: Float
         
-        public func getType() -> UInt16 { return IMU_MSG}
+        public func getType() -> UInt16 { return ODOMETRY_MSG}
         
         public init(positionX: Float,
                     positionY: Float,
