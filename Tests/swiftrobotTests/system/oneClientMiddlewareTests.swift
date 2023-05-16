@@ -72,4 +72,62 @@ final class oneClientMiddlewareTests: XCTestCase {
         client.publish(channel: 0x01, msg: pubMsg)
         wait(for: [expectation1, expectation2], timeout: timeout)
     }
+    
+    func testSubscribeOverload() {
+        let pubMsg = base_msg.UInt8Array(data: [1])
+        let pubMsg2 = base_msg.UInt8Array(data: [2])
+        
+        let expectation = XCTestExpectation(description: "subscribe")
+        let expectationNot = XCTestExpectation(description: "subscribe not triggered")
+        expectationNot.isInverted = true
+        
+        let expectationDummy = XCTestExpectation(description: "dummy")
+        expectationDummy.isInverted = true
+        
+        client.subscribe(channel: 0x01) { (msg: base_msg.UInt8Array) in
+            self.wait(for: [expectationDummy], timeout: 0.1)
+            if msg.data[0] == 1 {
+                XCTAssertEqual(msg.size, pubMsg.size)
+                XCTAssertEqual(msg.data, pubMsg.data)
+                expectation.fulfill()
+            } else {
+                expectationNot.fulfill()
+            }
+        }
+        client.publish(channel: 0x01, msg: pubMsg)
+        client.publish(channel: 0x01, msg: pubMsg2)
+        
+        wait(for: [expectation, expectationNot], timeout: 1)
+    }
+    
+    func testSubscribeOverloadButQueueBigger() {
+        let pubMsg = base_msg.UInt8Array(data: [1])
+        let pubMsg2 = base_msg.UInt8Array(data: [2])
+        
+        let expectation = XCTestExpectation(description: "subscribe")
+        let expectation2 = XCTestExpectation(description: "subscribe2")
+        
+        let expectationDummy = XCTestExpectation(description: "dummy")
+        expectationDummy.isInverted = true
+        let expectationDummy2 = XCTestExpectation(description: "dummy")
+        expectationDummy2.isInverted = true
+        
+        client.subscribe(channel: 0x01, queue_size: 2) { (msg: base_msg.UInt8Array) in
+            if msg.data[0] == 1 {
+                self.wait(for: [expectationDummy], timeout: 0.1)
+                XCTAssertEqual(msg.size, pubMsg.size)
+                XCTAssertEqual(msg.data, pubMsg.data)
+                expectation.fulfill()
+            } else {
+                self.wait(for: [expectationDummy2], timeout: 0.1)
+                XCTAssertEqual(msg.size, pubMsg2.size)
+                XCTAssertEqual(msg.data, pubMsg2.data)
+                expectation2.fulfill()
+            }
+        }
+        client.publish(channel: 0x01, msg: pubMsg)
+        client.publish(channel: 0x01, msg: pubMsg2)
+        
+        wait(for: [expectation, expectation2], timeout: 1)
+    }
 }
