@@ -2,7 +2,7 @@
 
 swiftrobot is a lightweight and easy-to-use middleware for robotic applications. It provides a way to communicate between different components of a robot's software stack, allowing for seamless integration and rapid development.
 
-Using the C++ implementation [swiftrobotc](https://github.com/danielriege/swiftrobotc), it is possible to communicate with iOS devices via USB. This allows for an easy and real-time usable integration of iPhones and iPads as sensors, controllers, or displays for your robot.
+A USB connection between a macOS and iOS device can be used to get a higher bandwith and lower latency. Swiftrobot will automatically use USB communication if available. Using the C++ implementation [swiftrobotc](https://github.com/danielriege/swiftrobotc), it is possible to communicate between iOS devices and Linux devices via USB. This allows for an easy and real-time usable integration of iPhones and iPads as sensors, controllers, or displays for your robot.
 
 With swiftrobot's publish/subscribe messaging system, you can easily build distributed systems for robots. This package includes a Swift implementation of the middleware, and it can be used to communicate between different processes on the same machine or across a local network. 
 
@@ -16,7 +16,7 @@ Possible use cases:
 
 - Bonjour service discovery, so clients connect to each other without any manual configuration needed.
 - Publish/Subscribe messaging system based on shared memory or TCP sockets.
-- USB communication between for iOS devices using [swiftrobotc](https://github.com/danielriege/swiftrobotc).
+- USB communication for iOS devices
 - Custom message types. (Planned)
 - Parameter distribution which enables dynamic reconfigure of software components. (Planned)
 - Recording and playback of message passings with time encoding. (Planned)
